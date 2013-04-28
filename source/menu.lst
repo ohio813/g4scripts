@@ -1,0 +1,10 @@
+default 0
+timeout 10
+
+title ConGrub - ((hd0,0),(hd0,10))
+ConGrub.g4b
+boot
+
+title ConGrub - ((hd1,0),(hd1,10))
+ConGrub.g4b 1 10
+boot
