@@ -25,7 +25,7 @@ set drive = %2
 if "%1"=="" set disk = 0
 if "%2"=="" set drive = 10
 echo -e \x0 > %memDrive%	## Initiaize mem drive
-wenv for /L %p in (0,1,%drive%) do exec %0 findDLL %disk% %p	## Iterate over HD partitions
+wenv for /L %p in (0,1,%disk%) do for /L %q in (0,1,%drive%) do exec %0 findDLL %p %q	## Iterate over HD partitions
 if "%osFound%"==""  echo No Windows installation found!	&& pause && goto :EOF		## Display Windows installations found
 echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst \nboot >> %memDrive%
 echo -e \x0 >> %memDrive%	## EOF marker for configfile
