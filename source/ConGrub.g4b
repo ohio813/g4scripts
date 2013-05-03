@@ -8,15 +8,18 @@ insmod %0 > nul
 
 :: Call the subroutine specified as first parameter of the script
 if "%1"=="findDLL" goto :findDLL
+if "%1"=="isWinDir" goto :isWinDir
 if "%1"=="patchDLL" goto :patchDLL
 if "%1"=="readByte" goto :readByte
 if "%1"=="help" goto :help
 
 
 :: Relative path of the DLL to be patched
-set dllPath = /WINDOWS/system32/msv1_0.dll	
-set memDrive = (md)0x3000+1
+set dll = /system32/msv1_0.dll	
+set confDrv = (md)0x2000+1
+set dirDrv = (md)0x5800+80
 set osFound =
+echo -e \x0 > %confDrv%		## Initialize mem drive
 
 
 :: Find Windows installations
@@ -27,32 +30,28 @@ if not "%1"=="" goto :forceDetect
 :: If debug is on, output is too verbose
 :: So, set debug to normal and turn it off immediately after
 debug normal
-find --devices=h > %memDrive%
+find --devices=h > %confDrv%
 debug off
 set /a skip = 0
 :autoLoop
-cat --locate=\x0a --number=1 --skip=%skip% %memDrive% || goto :displayMenu
+cat --locate=\x0a --number=1 --skip=%skip% %confDrv% || goto :displayMenu
 set /a length = %?% - %skip%
-cat --skip=%skip% --length=%length% %memDrive% | set dev =
+cat --skip=%skip% --length=%length% %confDrv% | set dev =
 set /a skip = %length% + %skip% + 1
 call %0 findDLL %dev%
 goto :autoLoop
 
-:wait
-pause
-goto :EOF
 
 :: Force detection of Windows installation
 :forceDetect
-echo -e \x0 > %memDrive%	## Initiaize mem drive
 wenv for /L %p in (0,1,%1) do for /L %q in (0,1,%2) do exec %0 findDLL %p %q		## Iterate over HD partitions
 
 
 :displayMenu
 if "%osFound%"==""  echo No Windows installation found!	&& pause && goto :EOF		## Display Windows installations found
-echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst \nboot >> %memDrive%
-echo -e \x0 >> %memDrive%	## EOF marker for configfile
-configfile %memDrive%
+echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst \nboot >> %confDrv%
+echo -e \x0 >> %confDrv%	## EOF marker for configfile
+configfile %confDrv%
 goto :EOF
 
 
@@ -62,9 +61,16 @@ goto :EOF
 :: Searches for msv1_0.dll, %1 = findDLL, %2 = Disk#, %3 = Partition#
 :findDLL
 set dllRoot = %2
-set diskDrv = 1
-if not "%dllRoot:~0,1%"=="(" set dllRoot = (hd%2,%3) && set diskDrv = 0
-cat --length=0 %dllRoot%%%dllPath% || goto :EOF	## Don't proceed further for non-existent partitions
+if not "%dllRoot:~0,1%"=="(" set dllRoot = (hd%2,%3)
+wenv dir %dllRoot%/ > %dirDrv%
+wenv for /f %i in ( %dirDrv% ) do exec %0 isWinDir %i
+goto :EOF
+
+
+:: Checks if the directory contains Windows installation, %1 = isWinDir, %2 = Directory
+:isWinDir
+set dllPath = %dllRoot%/%2%dll%
+cat --length=0 %dllPath% || goto :EOF	## Don't proceed further for non-existent partitions
 :: Get size of msv1_0.dll in bytes
 set /a len = *0x8290
 :: Start forming menu items
@@ -76,13 +82,12 @@ if "%len%"=="210432" set osFound = 2008
 if "%len%"=="132608" set osFound = XP
 if "%len%"=="213504" set osFound = Vista
 if "%len%"=="257024" set osFound = 7
-if "%diskDrv%"=="0" set grubMenu = %grubMenu% %osFound%, Disk %2, Partition %3 \ncall %0 patchDLL 0 %2 %osFound% \npause \nboot
-if "%diskDrv%"=="1" set grubMenu = %grubMenu% %osFound% at %dllRoot% \ncall %0 patchDLL 0 %2 %osFound% \npause \nboot
-echo -e %grubMenu% >> %memDrive%	## Write configfile to mem drive
+set grubMenu = %grubMenu% %osFound% at %dllRoot% \ncall %0 patchDLL %dllRoot% %2 %osFound% \npause \nboot
+echo -e %grubMenu% >> %confDrv%	## Write configfile to mem drive
 goto :EOF
 
 
-:: Patches DLL file, %1 = patchFile, %2 = Disk#, %3 = Partition#, %4 = Windows version
+:: Patches DLL file, %1 = patchFile, %2 = (hdX,Y), %3 = WinDir, %4 = Windows version
 :patchDLL
 if not exist (bd)/patch/%4.patch echo Patch file not found in /patch directory && pause && goto :EOF
 set fileByte = 0
@@ -96,9 +101,9 @@ if %length%>=1 cat --skip=%offset% --length=%length% (bd)/patch/%4.patch | set p
 set patchOff = %patchRow:~0,8%
 set oldByte = %patchRow:~10,2%
 set newByte = %patchRow:~13,2%
-call %0 readByte (hd%2,%3)%dllPath% 0x%patchOff%
-if "%fileByte%"=="%oldByte%" write --offset=0x%patchOff% (hd%2,%3)%dllPath% \x%newByte%
-if "%fileByte%"=="%newByte%" write --offset=0x%patchOff% (hd%2,%3)%dllPath% \x%oldByte%
+call %0 readByte %2/%3%dll% 0x%patchOff%
+if "%fileByte%"=="%oldByte%" write --offset=0x%patchOff% %2/%3%dll% \x%newByte%
+if "%fileByte%"=="%newByte%" write --offset=0x%patchOff% %2/%3%dll% \x%oldByte%
 set /a offset = %offset% + %length% + 2  > nul
 goto :patchLoop
 :patched
@@ -117,12 +122,11 @@ goto :EOF
 :help
 echo -e \nConGrub v1.0 - Coded by Sherlock, Idea by jaclaz
 echo Released under the jaclaz's CAREWARE license
-echo -e \nUsage: ConGrub.g4b <Disk#> <MaxPartition#>\n
-echo By default, ConGrub searches from (hd0,0) to (hd0,10) for Windows installations
-echo If the OS is installed on a non-first hard disk, provide appropriate Disk#
-echo If the OS is installed on a partition beyond partition# 10, provide appropriate MaxPartition#
+echo -e \nUsage: ConGrub.g4b <MaxDisk#> <MaxPartition#>\n
+echo By default, ConGrub tries to autodetect Windows installations
+echo If autodetection fails, provide MaxDisk# and MaxPartition# 
+echo to forcedetect and guide the script manually 
 echo ConGrub.g4b script, WENV binary and patch directory containing 
 echo patch files need to be present on the root of the boot media.
 echo Patch file has to be created by "fc /b <originalDLL> <patchedDLL> > <OS>.patch"
 echo with its first line deleted from the captured output
-echo
