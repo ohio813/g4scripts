@@ -17,6 +17,7 @@ if "%1"=="help" goto :help
 :: Relative path of the DLL to be patched
 set dll = /system32/msv1_0.dll	
 set confDrv = (md)0x2000+1
+set devDrv = (md)0x2500+1
 set dirDrv = (md)0x5800+80
 set osFound =
 echo -e \x0 > %confDrv%		## Initialize mem drive
@@ -26,17 +27,17 @@ echo -e \x0 > %confDrv%		## Initialize mem drive
 
 :: Attempt to auto-detect Windows installation
 if not "%1"=="" goto :forceDetect
-:: If debug is off, nothing nothing is written to output
+:: If debug is off, nothing is written to output
 :: If debug is on, output is too verbose
 :: So, set debug to normal and turn it off immediately after
 debug normal
-find --devices=h > %confDrv%
+find --devices=h > %devDrv%
 debug off
 set /a skip = 0
 :autoLoop
-cat --locate=\x0a --number=1 --skip=%skip% %confDrv% || goto :displayMenu
+cat --locate=\x0a --number=1 --skip=%skip% %devDrv% || goto :displayMenu
 set /a length = %?% - %skip%
-cat --skip=%skip% --length=%length% %confDrv% | set dev =
+cat --skip=%skip% --length=%length% %devDrv% | set dev =
 set /a skip = %length% + %skip% + 1
 call %0 findDLL %dev%
 goto :autoLoop
@@ -87,7 +88,7 @@ echo -e %grubMenu% >> %confDrv%	## Write configfile to mem drive
 goto :EOF
 
 
-:: Patches DLL file, %1 = patchFile, %2 = (hdX,Y), %3 = WinDir, %4 = Windows version
+:: Patches DLL file, %1 = patchDLL, %2 = (hdX,Y), %3 = WinDir, %4 = Windows version
 :patchDLL
 if not exist (bd)/patch/%4.patch echo Patch file not found in /patch directory && pause && goto :EOF
 set fileByte = 0
