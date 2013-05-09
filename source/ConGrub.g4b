@@ -9,18 +9,18 @@ insmod %0 > nul
 :: Call the subroutine specified as first parameter of the script
 if "%1"=="findDLL" goto :findDLL
 if "%1"=="isWinDir" goto :isWinDir
+if "%1"=="patchUnpatch" goto :patchUnpatch
 if "%1"=="patchDLL" goto :patchDLL
-if "%1"=="readByte" goto :readByte
+if "%1"=="unPatchDLL" goto :unPatchDLL
 if "%1"=="help" goto :help
 
 
-:: Relative path of the DLL to be patched
-set dll = /system32/msv1_0.dll	
-set confDrv = (md)0x2000+1
+set dll = /system32/msv1_0.dll
+set osDrv = (md)0x2000+1
+set patchDrv = (md)0x2300+1
 set devDrv = (md)0x2500+1
 set dirDrv = (md)0x5800+80
-set osFound =
-echo -e \x0 > %confDrv%		## Initialize mem drive
+echo -e \x0 > %osDrv%		## Initialize mem drive
 
 
 :: Find Windows installations
@@ -50,9 +50,9 @@ wenv for /L %p in (0,1,%1) do for /L %q in (0,1,%2) do exec %0 findDLL %p %q		##
 
 :displayMenu
 if "%osFound%"==""  echo No Windows installation found!	&& pause && goto :EOF		## Display Windows installations found
-echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst \nboot >> %confDrv%
-echo -e \x0 >> %confDrv%	## EOF marker for configfile
-configfile %confDrv%
+echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst \nboot >> %osDrv%
+echo -e \x0 >> %osDrv%	## EOF marker for configfile
+configfile %osDrv%
 goto :EOF
 
 
@@ -77,46 +77,47 @@ set /a len = *0x8290
 :: Start forming menu items
 set grubMenu = \ntitle Windows
 :: Check for Windows version based on size of msv1_0.dll
+set osFound =
 if "%len%"=="97040" set osFound = 2000
 if "%len%"=="144384" set osFound = 2003
 if "%len%"=="210432" set osFound = 2008
 if "%len%"=="132608" set osFound = XP
 if "%len%"=="213504" set osFound = Vista
 if "%len%"=="257024" set osFound = 7
-set grubMenu = %grubMenu% %osFound% at %dllRoot% \ncall %0 patchDLL %dllRoot% %2 %osFound% \npause \nboot
-echo -e %grubMenu% >> %confDrv%	## Write configfile to mem drive
+set grubMenu = %grubMenu% %osFound% at %dllRoot% \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
+echo -e %grubMenu% >> %osDrv%			## Write configfile to mem drive
 goto :EOF
 
 
-:: Patches DLL file, %1 = patchDLL, %2 = (hdX,Y), %3 = WinDir, %4 = Windows version
+:: Patch or Unpatch?
+:patchUnpatch
+echo -e title Patch \ncall %0 patchDLL %2 %3 \npause \nboot > %patchDrv%
+echo -e title UnPatch \ncall %0 unPatchDLL %2 %3 \npause \nboot >> %patchDrv%
+echo -e title Back to OS detection \nconfigfile %osDrv% \npause \nboot >> %patchDrv%
+echo -e \x0 >> %patchDrv%			## EOF marker for configfile
+configfile %patchDrv%
+goto :EOF
+
+
+:: Patches DLL file, %1 = patchDLL, %2 = (hdX,Y), %3 = WinDir
 :patchDLL
-if not exist (bd)/patch/%4.patch echo Patch file not found in /patch directory && pause && goto :EOF
-set fileByte = 0
-set offset = 0
-set length = 0
-:patchLoop
-cat --locate=\x0d\x0a --number=1 --skip=%offset% (bd)/patch/%4.patch > nul
-if "%?%"=="0x0" goto :patched
-set /a length = %?% - %offset% > nul
-if %length%>=1 cat --skip=%offset% --length=%length% (bd)/patch/%4.patch | set patchRow = 
-set patchOff = %patchRow:~0,8%
-set oldByte = %patchRow:~10,2%
-set newByte = %patchRow:~13,2%
-call %0 readByte %2/%3%dll% 0x%patchOff%
-if "%fileByte%"=="%oldByte%" write --offset=0x%patchOff% %2/%3%dll% \x%newByte%
-if "%fileByte%"=="%newByte%" write --offset=0x%patchOff% %2/%3%dll% \x%oldByte%
-set /a offset = %offset% + %length% + 2  > nul
-goto :patchLoop
-:patched
+set dllPath = %2/%3%dll%
+cat --locate=\x33\xC0\x90 %dllPath% > nul
+if "%@retval%"=="1" goto :warnUser
+cat --hex --locate=\x83\xF8\x10 --replace=\x33\xC0\x90 %dllPath% > nul
 echo DLL patched
 goto :EOF
+:warnUser
+echo This DLL version is not compatible or has been already patched
+configfile %osDrv%
+goto :EOF
 
 
-:: Reads one byte from file, %1 = readByte, %2 = File path, %3 = Offset
-:: Output appears in variable "fileByte" in HEX, initialize the variable prior to calling the routine
-:readByte
-cat --hex --skip=%3 --length=1 %2 | set fileByte = 
-set fileByte = %fileByte:~10,2%
+:: Unpatches DLL file, %1 = patchDLL, %2 = (hdX,Y), %3 = WinDir
+:unPatchDLL
+set dllPath = %2/%3%dll%
+cat --hex --locate=\x33\xC0\x90 --replace=\x83\xF8\x10 %dllPath% > nul
+echo DLL unpatched
 goto :EOF
 
 
