@@ -128,7 +128,5 @@ echo -e \nUsage: ConGrub.g4b <MaxDisk#> <MaxPartition#>\n
 echo By default, ConGrub tries to autodetect Windows installations
 echo If autodetection fails, provide MaxDisk# and MaxPartition# 
 echo to forcedetect and guide the script manually 
-echo ConGrub.g4b script, WENV binary and patch directory containing 
-echo patch files need to be present on the root of the boot media.
-echo Patch file has to be created by "fc /b <originalDLL> <patchedDLL> > <OS>.patch"
-echo with its first line deleted from the captured output
+echo ConGrub.g4b script and WENV binary need to be
+echo present on the root of the boot media.
