@@ -8,6 +8,7 @@ insmod %0 > nul
 
 :: Call the subroutine specified as first parameter of the script
 if "%1"=="findDLL" goto :findDLL
+if "%1"=="findWinVer" goto :findWinVer
 if "%1"=="isWinDir" goto :isWinDir
 if "%1"=="patchUnpatch" goto :patchUnpatch
 if "%1"=="patchDLL" goto :patchDLL
@@ -49,7 +50,7 @@ wenv for /L %p in (0,1,%1) do for /L %q in (0,1,%2) do exec %0 findDLL %p %q		##
 
 
 :displayMenu
-if "%osFound%"==""  echo No Windows installation found!	&& pause && goto :EOF		## Display Windows installations found
+if "%os%"==""  echo No Windows installation found!	&& pause && goto :EOF		## Display Windows installations found
 echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst \nboot >> %osDrv%
 echo -e \x0 >> %osDrv%	## EOF marker for configfile
 configfile %osDrv%
@@ -72,20 +73,59 @@ goto :EOF
 :isWinDir
 set dllPath = %dllRoot%/%2%dll%
 cat --length=0 %dllPath% || goto :EOF	## Don't proceed further for non-existent partitions
-:: Get size of msv1_0.dll in bytes
-set /a len = *0x8290
 :: Start forming menu items
 set grubMenu = \ntitle Windows
 :: Check for Windows version based on size of msv1_0.dll
-set osFound =
-if "%len%"=="97040" set osFound = 2000
-if "%len%"=="144384" set osFound = 2003
-if "%len%"=="210432" set osFound = 2008
-if "%len%"=="132608" set osFound = XP
-if "%len%"=="213504" set osFound = Vista
-if "%len%"=="257024" set osFound = 7
-set grubMenu = %grubMenu% %osFound% at %dllRoot% \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
+call %0 findWinVer %dllPath%
+set grubMenu = %grubMenu% %os% at %dllRoot% \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
 echo -e %grubMenu% >> %osDrv%			## Write configfile to mem drive
+goto :EOF
+
+
+:: Find version of Windows installed
+:: This batch should print the version of
+:: .dll's tested on 32-bit ONLY
+:: You must provide a fully qualified path as parameter.
+:: Example: (hd0,0)/Windows/System32/msv1_0.dll
+:: or a valid relative path from current ROOT:
+:: /Windows/System32/msv1_0.dll
+:findWinVer
+# String is "FileV" in Unicode
+set file=%~dpnx2
+set string=\x01\x00\x46\x00\x69\x00\x6C\x00\x65\x00\x56\x00
+set version=
+set char=
+
+cat --hex --locate=%string% %file% > nul
+set /a offbase = %?% + 27
+
+set /a counter=1
+:loop
+set /a figure=0
+set /a offset=%offbase%+%counter%
+cat --skip=%offset% --length=1 %file% | set char=
+
+:floop
+if "%char%"=="%figure%" set version=%version%%%char%
+set /a figure=%figure%+1
+if "%figure%"=="10" goto :fnext
+goto :floop
+
+:fnext
+if "%char%"=="." set version=%version%%%char%
+set /a counter=%counter%+1
+if "%counter%"=="30" goto :next
+goto :loop
+
+:next
+set majmin=%version:~0,3%
+set os=(Unknown)
+if "%majmin%"=="5.0" set os=2000
+if "%majmin%"=="5.1" set os=XP
+if "%majmin%"=="5.2" set os=XP 64-bit or Server 2003
+if "%majmin%"=="6.0" set os=Vista or Server 2008
+if "%majmin%"=="6.1" set os=7 or Server 2008 R2
+if "%majmin%"=="6.2" set os=8 or Server 2012
 goto :EOF
 
 
@@ -122,7 +162,7 @@ goto :EOF
 
 
 :help
-echo -e \nConGrub v1.0 - Coded by Sherlock, Idea by jaclaz
+echo -e \nConGrub v1.0 - Idea by jaclaz, Coded by Sherlock
 echo Released under the jaclaz's CAREWARE license
 echo -e \nUsage: ConGrub.g4b <MaxDisk#> <MaxPartition#>\n
 echo By default, ConGrub tries to autodetect Windows installations
