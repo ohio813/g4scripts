@@ -1,10 +1,10 @@
 default 0
 timeout 10
 
-title ConGrub - (Autodetect)
-ConGrub.g4b
+title PassPass - (Autodetect)
+PassPass.g4b
 boot
 
-title ConGrub - (Forcedetect)
-ConGrub.g4b 1 10
+title PassPass - (Forcedetect)
+PassPass.g4b 1 10
 boot
