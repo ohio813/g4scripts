@@ -40,7 +40,7 @@ cat --locate=\x0a --number=1 --skip=%skip% %devDrv% > nul || goto :displayMenu
 set /a length = %?% - %skip%
 cat --skip=%skip% --length=%length% %devDrv% | set dev =
 set /a skip = %length% + %skip% + 1
-call %0 findDLL %dev%
+if not "%?_BOOT:~0,4%"=="%dev:~0,4%" echo Checking %dev%... && call %~pnx0 findDLL %dev%	#Prevents searching boot device
 goto :autoLoop
 
 
@@ -148,15 +148,16 @@ if "%@retval%"=="1" goto :warnUser
 cat --locate=\x64\x86 %dllPath% > nul
 if not "%@retval%"=="0" goto :64BitPatch
 cat --hex --locate=\x83\xF8\x10 --replace=\x33\xC0\x90 %dllPath% > nul
+if "%@retval%"=="0" goto :warnUser
 goto :patchMessage
 :64BitPatch
 cat --hex --locate=\x48\x3B\xC6\x0F\x85 --replace=\x33\xC0\x90\x0F\x85 %dllPath% > nul
+if "%@retval%"=="0" goto :warnUser
 :patchMessage
 echo DLL patched
 goto :EOF
 :warnUser
-echo This DLL version is not compatible or has been already patched
-pause
+pause Thie DLL is not compatible or has been already patched or unpatched
 configfile %osDrv%
 goto :EOF
 
@@ -166,18 +167,20 @@ goto :EOF
 set dllPath = %2/%3%dll%
 :: Check for 0x6486 to identify 64-bit PE
 cat --locate=\x64\x86 %dllPath% > nul
-if "%@retval%"=="1" goto :64BitUnpatch
+if not "%@retval%"=="0" goto :64BitPatch
 cat --hex --locate=\x33\xC0\x90 --replace=\x83\xF8\x10 %dllPath% > nul
+if "%@retval%"=="0" goto :warnUser
 goto :unpatchMessage
 :64BitUnpatch
 cat --hex --locate=\x33\xC0\x90\x0F\x85 --replace=\x48\x3B\xC6\x0F\x85 %dllPath% > nul
+if "%@retval%"=="0" goto :warnUser
 :unpatchMessage
 echo DLL unpatched
 goto :EOF
 
 
 :help
-echo -e \nPassPass v1.0 - Idea by jaclaz, Coded by Sherlock
+echo -e \nPassPass v1.1 - Idea by jaclaz, Coded by Sherlock
 echo Released under the jaclaz's CAREWARE license
 echo -e \nUsage: PassPass.g4b <MaxDisk#> <MaxPartition#>\n
 echo By default, PassPass tries to autodetect Windows installations
