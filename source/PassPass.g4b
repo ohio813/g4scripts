@@ -157,7 +157,7 @@ if "%@retval%"=="0" goto :warnUser
 echo DLL patched
 goto :EOF
 :warnUser
-pause Thie DLL is not compatible or has been already patched or unpatched
+pause This DLL is not compatible or has been already patched or unpatched
 configfile %osDrv%
 goto :EOF
 
@@ -167,7 +167,7 @@ goto :EOF
 set dllPath = %2/%3%dll%
 :: Check for 0x6486 to identify 64-bit PE
 cat --locate=\x64\x86 %dllPath% > nul
-if not "%@retval%"=="0" goto :64BitPatch
+if not "%@retval%"=="0" goto :64BitUnPatch
 cat --hex --locate=\x33\xC0\x90 --replace=\x83\xF8\x10 %dllPath% > nul
 if "%@retval%"=="0" goto :warnUser
 goto :unpatchMessage
