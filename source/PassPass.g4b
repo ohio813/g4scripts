@@ -28,7 +28,7 @@ echo -e \x0 > %osDrv%		## Initialize mem drive
 
 :: Attempt to auto-detect Windows installation
 if not "%1"=="" goto :forceDetect
-:: If debug is off, nothing is written to output
+:: If debug is off, nothing is written to memdrive
 :: If debug is on, output is too verbose
 :: So, set debug to normal and turn it off immediately after
 debug normal
@@ -40,7 +40,11 @@ cat --locate=\x0a --number=1 --skip=%skip% %devDrv% > nul || goto :displayMenu
 set /a length = %?% - %skip%
 cat --skip=%skip% --length=%length% %devDrv% | set dev =
 set /a skip = %length% + %skip% + 1
-if not "%?_BOOT:~0,4%"=="%dev:~0,4%" echo Checking %dev%... && call %~pnx0 findDLL %dev%	#Prevents searching boot device
+if "%1"=="BOOTDEV" goto :skipBoot
+if "%?_BOOT:~0,4%"=="%dev:~0,4%" goto :autoLoop		## Prevents searching boot device
+:skipBoot
+echo Checking %dev%...
+call %~pnx0 findDLL %dev%
 goto :autoLoop
 
 
@@ -143,7 +147,7 @@ goto :EOF
 :patchDLL
 set dllPath = %2/%3%dll%
 cat --locate=\x33\xC0\x90 %dllPath% > nul
-if "%@retval%"=="1" goto :warnUser
+if not "%@retval%"=="0" goto :warnUser
 :: Check for 0x6486 to identify 64-bit PE
 cat --locate=\x64\x86 %dllPath% > nul
 if not "%@retval%"=="0" goto :64BitPatch
@@ -182,8 +186,10 @@ goto :EOF
 :help
 echo -e \nPassPass v1.1 - Idea by jaclaz, Coded by Sherlock
 echo Released under the jaclaz's CAREWARE license
-echo -e \nUsage: PassPass.g4b <MaxDisk#> <MaxPartition#>\n
-echo By default, PassPass tries to autodetect Windows installations
+echo -e \nUsage: PassPass.g4b [BOOTDEV] | [<MaxDisk#> <MaxPartition#>]\n
+echo By default, PassPass tries to search for Windows installations
+echo on all but boot device. BOOTDEV switch makes PassPass search
+echo boot media, too.
 echo If autodetection fails, provide MaxDisk# and MaxPartition# 
 echo to forcedetect and guide the script manually 
 echo PassPass.g4b script and WENV binary need to be
