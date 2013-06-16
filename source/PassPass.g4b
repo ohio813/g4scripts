@@ -27,7 +27,9 @@ echo -e \x0 > %osDrv%		## Initialize mem drive
 :: Find Windows installations
 
 :: Attempt to auto-detect Windows installation
+if "%1"=="BOOTDEV" goto :autoDetect
 if not "%1"=="" goto :forceDetect
+:autoDetect
 :: If debug is off, nothing is written to memdrive
 :: If debug is on, output is too verbose
 :: So, set debug to normal and turn it off immediately after
