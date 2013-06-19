@@ -2,14 +2,14 @@ default 0
 timeout 10
 
 title PassPass - (Autodetect)
-PassPass.g4b
+PassPass
 boot
 
 title PassPass - (Forcedetect)
-PassPass.g4b 1 10
+PassPass 1 10
 boot
 
-title Boot from Internal Hdd
+title Boot from Internal HDD
 if "%?_BOOT:~0,3%"=="(hd" map (hd0) (hd1)
 if "%?_BOOT:~0,3%"=="(hd" map (hd1) (hd0)
 if "%?_BOOT:~0,3%"=="(hd" map --hook

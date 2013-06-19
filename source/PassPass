@@ -1,11 +1,5 @@
 !BAT
 
-errorcheck off
-debug off
-insmod wenv > nul
-insmod %0 > nul
-
-
 :: Call the subroutine specified as first parameter of the script
 if "%1"=="findDLL" goto :findDLL
 if "%1"=="findWinVer" goto :findWinVer
@@ -16,12 +10,24 @@ if "%1"=="unPatchDLL" goto :unPatchDLL
 if "%1"=="help" goto :help
 
 
+delmod -l wenv > nul || insmod /wenv > nul
+delmod -l %~nx0 > nul || insmod %0 > nul
+debug off
+
+
 set dll = /system32/msv1_0.dll
-set osDrv = (md)0x2000+1
-set patchDrv = (md)0x2300+1
-set devDrv = (md)0x2500+1
+set osDrv = (md)0x2000+2
+set patchDrv = (md)0x2300+2
+set devDrv = (md)0x2500+2
 set dirDrv = (md)0x5800+80
 echo -e \x0 > %osDrv%		## Initialize mem drive
+
+
+# Clear memory in case it contains bytes that look like a compressed file header!
+echo ffffffffffffff > %osDrv%
+echo ffffffffffffff > %patchDrv%
+echo ffffffffffffff > %devDrv%
+echo ffffffffffffff > %dirDrv%
 
 
 :: Find Windows installations
@@ -52,12 +58,15 @@ goto :autoLoop
 
 :: Force detection of Windows installation
 :forceDetect
-wenv for /L %p in (0,1,%1) do for /L %q in (0,1,%2) do exec %0 findDLL %p %q		## Iterate over HD partitions
+errorcheck off
+wenv for /L %p in (0,1,%1) do for /L %q in (0,1,%2) do exec %0 findDLL %p %q		## Blindly try to iterate over HD partitions
+errorcheck on
 
 
 :displayMenu
-if "%os%"==""  echo No Windows installation found!	&& pause && goto :EOF		## Display Windows installations found
-echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst \nboot >> %osDrv%
+if "%os%"==""  echo No Windows installation found!	&& pause && goto :EOF
+## Display Windows installations found
+echo -e \ntitle Back to Main Menu \nconfigfile /menu.lst >> %osDrv%
 echo -e \x0 >> %osDrv%	## EOF marker for configfile
 configfile %osDrv%
 goto :EOF
@@ -70,8 +79,11 @@ goto :EOF
 :findDLL
 set dllRoot = %2
 if not "%dllRoot:~0,1%"=="(" set dllRoot = (hd%2,%3)
+# Turn errorcheck OFF to prevent the script aborting while probing dummy partition
+errorcheck off
 wenv dir %dllRoot%/ > %dirDrv%
 wenv for /f %i in ( %dirDrv% ) do exec %0 isWinDir %i
+errorcheck on
 goto :EOF
 
 
@@ -81,7 +93,7 @@ set dllPath = %dllRoot%/%2%dll%
 cat --length=0 %dllPath% || goto :EOF	## Don't proceed further for non-existent partitions
 :: Start forming menu items
 set grubMenu = \ntitle Windows
-:: Check for Windows version based on size of msv1_0.dll
+:: Check for Windows version based on Major and Minor version no. of msv1_0.dll
 call %0 findWinVer %dllPath%
 set grubMenu = %grubMenu% %os% at %dllRoot% \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
 echo -e %grubMenu% >> %osDrv%			## Write configfile to mem drive
@@ -103,23 +115,23 @@ set version=
 set char=
 
 cat --hex --locate=%string% %file% > nul
-set /a offbase = %?% + 27
+set /a offbase = %?% + 27 > nul
 
-set /a counter=1
+set /a counter=1 > nul
 :loop
-set /a figure=0
-set /a offset=%offbase%+%counter%
+set /a figure=0 > nul
+set /a offset=%offbase%+%counter% > nul
 cat --skip=%offset% --length=1 %file% | set char=
 
 :floop
 if "%char%"=="%figure%" set version=%version%%%char%
-set /a figure=%figure%+1
+set /a figure=%figure%+1 > nul
 if "%figure%"=="10" goto :fnext
 goto :floop
 
 :fnext
 if "%char%"=="." set version=%version%%%char%
-set /a counter=%counter%+1
+set /a counter=%counter%+1 > nul
 if "%counter%"=="30" goto :next
 goto :loop
 
@@ -137,9 +149,12 @@ goto :EOF
 
 :: Patch or Unpatch?
 :patchUnpatch
-echo -e title Patch \ncall %0 patchDLL %2 %3 \npause \nboot > %patchDrv%
-echo -e title UnPatch \ncall %0 unPatchDLL %2 %3 \npause \nboot >> %patchDrv%
-echo -e title Back to OS detection \nconfigfile %osDrv% \npause \nboot >> %patchDrv%
+echo -e title Backup  %2/%3%dll% \\nBackup to \\\\PassPass.bak \ndd if=%2/%3%dll% of=(bd)/PassPass.bak \nif "%?%"=="1" pause \nconfigfile %patchDrv% > %patchDrv%
+echo -e title Restore %2/%3%dll% \\nRestore from \\\\PassPass.bak \ndd of=%2/%3%dll% if=(bd)/PassPass.bak \nif "%?%"=="1" pause \nconfigfile %patchDrv% >> %patchDrv%
+echo -e title Patch Windows on %2\\\\%3 \\n \ncall %0 patchDLL %2 %3 \npause \nconfigfile %patchDrv% >> %patchDrv%
+echo -e title UnPatch Windows on %2\\\\%3 \\n \ncall %0 unPatchDLL %2 %3 \npause \nconfigfile %patchDrv% >> %patchDrv%
+echo -e title Back to OS detection menu \nconfigfile %osDrv% \npause \nconfigfile %osDrv% >> %patchDrv%
+echo -e title Boot from Internal HDD \nif "%^?_BOOT:~0,3%"=="(hd" map (hd0) (hd1)\nif "%^?_BOOT:~0,3%"=="(hd" map (hd1) (hd0) \nif "%^?_BOOT:~0,3%"=="(hd" map --hook \nchainloader (hd0)+1 >> %patchDrv%
 echo -e \x0 >> %patchDrv%			## EOF marker for configfile
 configfile %patchDrv%
 goto :EOF
@@ -148,22 +163,32 @@ goto :EOF
 :: Patches DLL file, %1 = patchDLL, %2 = (hdX,Y), %3 = WinDir
 :patchDLL
 set dllPath = %2/%3%dll%
-cat --locate=\x33\xC0\x90 %dllPath% > nul
-if not "%@retval%"=="0" goto :warnUser
-:: Check for 0x6486 to identify 64-bit PE
-cat --locate=\x64\x86 %dllPath% > nul
-if not "%@retval%"=="0" goto :64BitPatch
-cat --hex --locate=\x83\xF8\x10 --replace=\x33\xC0\x90 %dllPath% > nul
-if "%@retval%"=="0" goto :warnUser
-goto :patchMessage
+call %0 findWinVer %dllPath%						# Check Windows version
+cat --locate=\x64\x86 --number=1 %dllPath% > nul	# Check for 0x6486 to identify 64-bit PE
+if "%@retval%"=="1" goto :64BitPatch
+
+:32BitPatch
+set patt=\x83\xF8\x10
+set rpatt=\x33\xC0\x90
+if "%majmin%"=="6.2" set patt=\x3B\xC6\x75\x13 && set rpatt=\x33\xC0\x75\x13
+goto :DoPatch
+
 :64BitPatch
-cat --hex --locate=\x48\x3B\xC6\x0F\x85 --replace=\x33\xC0\x90\x0F\x85 %dllPath% > nul
-if "%@retval%"=="0" goto :warnUser
-:patchMessage
-echo DLL patched
+set patt=\x48\x3B\xC6\x0F\x85
+set rpatt=\x33\xC0\x90\x0F\x85
+if "%majmin%"=="6.2" set patt=\x49\x3B\xC6\x0F\x85 && set rpatt=\x33\xC0\x90\x0F\x85
+
+:DoPatch
+:: Check whether we can unpatch
+cat --locate=%rpatt% --number=1 %dllPath% > nul
+if "%@retval%"=="1" goto :warnUserP
+cat --hex --locate=%patt% --replace=%rpatt% %dllPath% > nul
+if "%@retval%"=="0" goto :warnUserP
+echo DLL at %dllPath% patched
 goto :EOF
-:warnUser
-pause This DLL is not compatible or has been already patched or unpatched
+
+:warnUserP
+pause This DLL is not compatible or has been already been patched
 configfile %osDrv%
 goto :EOF
 
@@ -171,17 +196,30 @@ goto :EOF
 :: Unpatches DLL file, %1 = patchDLL, %2 = (hdX,Y), %3 = WinDir
 :unPatchDLL
 set dllPath = %2/%3%dll%
-:: Check for 0x6486 to identify 64-bit PE
-cat --locate=\x64\x86 %dllPath% > nul
-if not "%@retval%"=="0" goto :64BitUnPatch
-cat --hex --locate=\x33\xC0\x90 --replace=\x83\xF8\x10 %dllPath% > nul
-if "%@retval%"=="0" goto :warnUser
-goto :unpatchMessage
+call %0 findWinVer %dllPath%						# Check Windows version
+cat --locate=\x64\x86 --number=1 %dllPath% > nul	# Check for 0x6486 to identify 64-bit PE
+if "%@retval%"=="1" goto :64BitUnpatch
+
+:32BitUnpatch
+set patt=\x83\xF8\x10
+set rpatt=\x33\xC0\x90
+if "%majmin%"=="6.2" set patt=\x3B\xC6\x75\x13 && set rpatt=\x33\xC0\x75\x13
+goto :DoUnpatch
+
 :64BitUnpatch
-cat --hex --locate=\x33\xC0\x90\x0F\x85 --replace=\x48\x3B\xC6\x0F\x85 %dllPath% > nul
-if "%@retval%"=="0" goto :warnUser
-:unpatchMessage
-echo DLL unpatched
+set patt=\x48\x3B\xC6\x0F\x85
+set rpatt=\x33\xC0\x90\x0F\x85
+if "%majmin%"=="6.2" set patt=\x49\x3B\xC6\x0F\x85 && set rpatt=\x33\xC0\x90\x0F\x85
+
+:DoUnpatch
+cat --hex --locate=%rpatt% --replace=%patt% %dllPath% > nul
+if "%@retval%"=="0" goto :warnUserU
+echo DLL at %dllPath% unpatched
+goto :EOF
+
+:warnUserU
+pause This DLL is not compatible or has been already been unpatched
+configfile %osDrv%
 goto :EOF
 
 
@@ -190,8 +228,7 @@ echo -e \nPassPass v1.1 - Idea by jaclaz, Coded by Sherlock
 echo Released under the jaclaz's CAREWARE license
 echo -e \nUsage: PassPass.g4b [BOOTDEV] | [<MaxDisk#> <MaxPartition#>]\n
 echo By default, PassPass tries to search for Windows installations
-echo on all but boot device. BOOTDEV switch makes PassPass search
-echo boot media, too.
+echo on all but boot device. BOOTDEV switch makes PassPass search boot media, too.
 echo If autodetection fails, provide MaxDisk# and MaxPartition# 
 echo to forcedetect and guide the script manually 
 echo PassPass.g4b script and WENV binary need to be
