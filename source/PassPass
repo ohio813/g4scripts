@@ -10,8 +10,8 @@ if "%1"=="unPatchDLL" goto :unPatchDLL
 if "%1"=="help" goto :help
 
 
-delmod -l wenv > nul || insmod /wenv > nul
-delmod -l %~nx0 > nul || insmod %0 > nul
+delmod -l wenv > nul || insmod /wenv > nul || pause ERROR: Cannot find file wenv! && configfile /menu.lst
+delmod -l %~nx0 > nul  || insmod %0 > nul  || pause WARNING: %~nx0 name too long for insmod && configfile /menu.lst
 debug off
 
 
@@ -95,7 +95,7 @@ cat --length=0 %dllPath% || goto :EOF	## Don't proceed further for non-existent 
 set grubMenu = \ntitle Windows
 :: Check for Windows version based on Major and Minor version no. of msv1_0.dll
 call %0 findWinVer %dllPath%
-set grubMenu = %grubMenu% %os% at %dllRoot% \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
+set grubMenu = %grubMenu% %os% at %dllRoot%\%2 \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
 echo -e %grubMenu% >> %osDrv%			## Write configfile to mem drive
 goto :EOF
 
@@ -149,7 +149,7 @@ goto :EOF
 
 :: Patch or Unpatch?
 :patchUnpatch
-echo -e title Backup  %2/%3%dll% \\nBackup to \\\\PassPass.bak \ndd if=%2/%3%dll% of=(bd)/PassPass.bak \nif "%?%"=="1" pause \nconfigfile %patchDrv% > %patchDrv%
+echo -e title iftitle [if exist (bd)/PassPass.bak] Backup  %2/%3%dll% \\nBackup to \\\\PassPass.bak \ndd if=%2/%3%dll% of=(bd)/PassPass.bak \nif not "%^?%"=="0x0" pause \nconfigfile %patchDrv% > %patchDrv%
 echo -e title Restore %2/%3%dll% \\nRestore from \\\\PassPass.bak \ndd of=%2/%3%dll% if=(bd)/PassPass.bak \nif "%?%"=="1" pause \nconfigfile %patchDrv% >> %patchDrv%
 echo -e title Patch Windows on %2\\\\%3 \\n \ncall %0 patchDLL %2 %3 \npause \nconfigfile %patchDrv% >> %patchDrv%
 echo -e title UnPatch Windows on %2\\\\%3 \\n \ncall %0 unPatchDLL %2 %3 \npause \nconfigfile %patchDrv% >> %patchDrv%
