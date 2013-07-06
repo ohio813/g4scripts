@@ -95,7 +95,7 @@ cat --length=0 %dllPath% || goto :EOF	## Don't proceed further for non-existent 
 set grubMenu = \ntitle Windows
 :: Check for Windows version based on Major and Minor version no. of msv1_0.dll
 call %0 findWinVer %dllPath%
-set grubMenu = %grubMenu% %os% at %dllRoot%\%2 \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
+set grubMenu = %grubMenu% %os% at %dllRoot%/%2 \ncall %0 patchUnpatch %dllRoot% %2 \npause \nboot
 echo -e %grubMenu% >> %osDrv%			## Write configfile to mem drive
 goto :EOF
 
