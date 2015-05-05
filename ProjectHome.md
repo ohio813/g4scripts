@@ -1,0 +1,1 @@
+A collection of scripts for Grub4DOS boot-loader platform
